@@ -23,7 +23,7 @@ import anthropic
 from dotenv import load_dotenv
 
 MODEL = "claude-haiku-4-5"  # small/fast model -- classification doesn't need a heavyweight one
-DEFAULT_BATCH_SIZE = 75
+DEFAULT_BATCH_SIZE = 25
 MAX_TOKENS = 4096
 INPUT_PRICE_PER_MTOK = 1.00   # Haiku 4.5 pricing: $ per 1,000,000 input tokens
 OUTPUT_PRICE_PER_MTOK = 5.00  # output tokens cost more than input tokens
