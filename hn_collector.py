@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 import requests
 
 SEARCH_URL = "https://hn.algolia.com/api/v1/search"
+SEARCH_BY_DATE_URL = "https://hn.algolia.com/api/v1/search_by_date"
 HITS_PER_PAGE = 100  # Algolia's maximum per page
 
 
@@ -50,10 +51,16 @@ def clean_text(raw):
     return re.sub(r"[ \t]+", " ", html.unescape(text)).strip()
 
 
-def search(session, query, tag, page):
+def search(session, query, tag, page, since=None):
     # Wrapping the query in quotes makes Algolia match the exact phrase instead of any of the words.
     params = {"query": f'"{query}"', "tags": tag, "hitsPerPage": HITS_PER_PAGE, "page": page}
-    response = session.get(SEARCH_URL, params=params, timeout=30)
+    url = SEARCH_URL
+    if since:
+        # Date mode: only posts on/after `since`, newest first (the default ranking is by relevance).
+        ts = int(datetime.strptime(since, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
+        params["numericFilters"] = f"created_at_i>={ts}"
+        url = SEARCH_BY_DATE_URL
+    response = session.get(url, params=params, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -82,6 +89,7 @@ def main():
     parser.add_argument("--max-pages", type=int, default=3, help="Pages of 100 results per phrase per type.")
     parser.add_argument("--tags", nargs="+", default=["comment", "story"], choices=["comment", "story"])
     parser.add_argument("--delay", type=float, default=0.5, help="Seconds between requests.")
+    parser.add_argument("--since", help="Only posts on/after this date (YYYY-MM-DD), newest first.")
     args = parser.parse_args()
 
     queries = load_queries(args.queries)
@@ -96,7 +104,7 @@ def main():
                 new_here = 0
                 for page in range(args.max_pages):
                     try:
-                        data = search(session, query, tag, page)
+                        data = search(session, query, tag, page, args.since)
                     except requests.RequestException as e:
                         print(f"  ERROR '{query}' ({tag}, page {page}): {e}")
                         break
