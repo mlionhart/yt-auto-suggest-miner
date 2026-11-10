@@ -35,7 +35,9 @@ OUTPUT_PRICE_PER_MTOK = 5.00  # output tokens cost more than input tokens
 # "maybe" category both exist specifically to counter those.
 PROMPT_TEMPLATE = """You are screening search-autocomplete phrases to find ideas for software products.
 
-A "software idea" (category: software_idea) is any phrase where the underlying need could plausibly be solved by: a browser extension, a mobile app (iOS/Android), a web app or website, desktop software, a plugin/add-on, an automation script or macro, a bot, an API/integration, or a SaaS tool.
+A "software idea" (category: software_idea) is any phrase where the underlying need could plausibly be solved by software that actively DOES something for the user (tracks, automates, converts, syncs, generates, monitors, stores, organizes), delivered as: a browser extension, a mobile app (iOS/Android), a web app or website, desktop software, a plugin/add-on, an automation script or macro, a bot, an API/integration, or a SaaS tool.
+
+A webpage that merely explains or describes how to do something does NOT count -- "a help article could exist" is not a software idea. Physical, medical, legal, and hardware-repair topics are not_software even if a guide site could cover them. Trust/legitimacy/opinion questions about an existing service ("is X legit", "is X down", "is X worth it") are not_software. If the whole "solution" would be pointing someone at an existing built-in setting, that is not a software idea either.
 
 Do NOT require the phrase to literally mention "app," "extension," or "software" -- most good ideas won't use those words at all (e.g. "how to hide following list on instagram" is a strong browser-extension idea even though it never says "extension"). Judge based on the underlying need, not the literal wording.
 
@@ -44,10 +46,12 @@ Use category "not_software" for phrases with no plausible software angle (e.g. b
 
 For phrases classified as "software_idea" or "maybe", also give your best-guess "solution_type": one of browser extension, mobile app, web app, desktop app, script/automation, bot, plugin/add-on, api/integration, saas tool, other. Use null for "not_software".
 
+Also give "scope" for software_idea and maybe phrases: "standalone_product" if the need is substantial and ongoing enough to justify a dedicated tool, or "minor_feature" if it is a single narrow task or something an existing OS/app setting already does, which would realistically be one small feature inside a larger tool. Use null for "not_software".
+
 Give a short "reason" (under 12 words) for every phrase.
 
 Return ONLY a JSON array, one object per phrase, no other text, in this exact shape:
-[{{"id": 0, "category": "software_idea", "solution_type": "browser extension", "reason": "..."}}, ...]
+[{{"id": 0, "category": "software_idea", "solution_type": "browser extension", "scope": "standalone_product", "reason": "..."}}, ...]
 
 Include every id from 0 to {max_id} exactly once.
 
@@ -199,9 +203,18 @@ def main():
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--yes", action="store_true")
+    parser.add_argument("--only-flagged-from", help="Earlier classified file; re-check only phrases it tagged software_idea or maybe.")
     args = parser.parse_args()
 
     suggestions = load_suggestions(args.input)
+    if args.only_flagged_from:
+        flagged = set()
+        with open(args.only_flagged_from, encoding="utf-8") as f:
+            for line in f:
+                r = json.loads(line)
+                if r.get("category") in ("software_idea", "maybe"):
+                    flagged.add(r["suggestion"])
+        suggestions = [s for s in suggestions if s in flagged]
     already_done = load_done(args.output)
     remaining = [s for s in suggestions if s not in already_done]
 
@@ -254,6 +267,7 @@ def main():
                     "suggestion": phrase,
                     "category": r.get("category"),
                     "solution_type": r.get("solution_type"),
+                    "scope": r.get("scope"),
                     "reason": r.get("reason"),
                     "classified_at": datetime.now(timezone.utc).isoformat(),
                 }
