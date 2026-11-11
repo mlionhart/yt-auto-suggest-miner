@@ -6,3 +6,4 @@ results/*.jsonl
 memory/
 results/*.csv
 sec_user_agent.txt
+data/
