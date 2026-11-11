@@ -4,8 +4,8 @@ the SEC's free XBRL "company facts" API (https://data.sec.gov). Deferred revenue
 how much customers have prepaid for subscriptions.
 
 Rules this script follows (SEC fair-access policy): every request carries a User-Agent that identifies
-you, and we stay well under 10 requests/second. Put your identification in .env as:
-    SEC_USER_AGENT=Your Name your-email@example.com
+you, and we stay well under 10 requests/second. Put your identification in sec_user_agent.txt as:
+    a line in sec_user_agent.txt (gitignored):  Your Name your-email@example.com
 
 Limits: paying-subscriber counts (Duolingo, Spotify, ...) are NOT standard XBRL tags; they only appear in
 the filing text, so this script does not capture them.
@@ -68,8 +68,11 @@ def main():
 
     load_dotenv()
     user_agent = os.environ.get("SEC_USER_AGENT")
+    if not user_agent and os.path.exists("sec_user_agent.txt"):
+        with open("sec_user_agent.txt", encoding="utf-8") as f:
+            user_agent = f.read().strip()
     if not user_agent:
-        sys.exit("Missing SEC_USER_AGENT. Add a line like  SEC_USER_AGENT=Your Name your-email@example.com  to .env")
+        sys.exit("Missing contact info. Put a line like  Your Name your-email@example.com  in sec_user_agent.txt")
 
     session = requests.Session()
     session.headers["User-Agent"] = user_agent
